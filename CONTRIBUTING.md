@@ -99,7 +99,7 @@ Additional context:
 
 ```bash
 # 1. Fork and clone
-git clone https://github.com/your-username/market-intelligence-platform.git
+git clone https://github.com/Codex-Crusader/market-intelligence-platform.git
 cd market-intelligence-platform
 
 # 2. Create a virtual environment
