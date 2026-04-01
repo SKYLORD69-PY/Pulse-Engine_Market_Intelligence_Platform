@@ -17,6 +17,8 @@ import gzip
 import json
 import logging
 import os
+import threading
+import uuid
 from pathlib import Path
 
 from config import (
@@ -29,6 +31,19 @@ from config import (
 
 log = logging.getLogger(__name__)
 _storage_path = Path(STORAGE_DIR)
+
+# per-asset write locks — one bouncer per asset. orderly queue. no shoving
+_asset_locks: dict[str, threading.Lock] = {}
+_asset_locks_mutex = threading.Lock()
+
+
+def _get_asset_lock(asset_name: str) -> threading.Lock:
+    """Return the dedicated lock for *asset_name*, creating it on first use."""
+    with _asset_locks_mutex:
+        if asset_name not in _asset_locks:
+            _asset_locks[asset_name] = threading.Lock()
+        return _asset_locks[asset_name]
+
 
 # fields kept in reduced-detail snapshots — the diet version. all the shame, half the data
 _REDUCED_FIELDS = {
@@ -58,14 +73,20 @@ def _read_gz(path: Path) -> dict:
 
 
 def _write_gz(path: Path, data: dict) -> None:
-    # atomic write: scribble on a temp file, THEN swap it in. like sending a rough draft to
-    # the printer but only stapling the final copy. corruption is for politicians, not our files
+    # atomic write: scribble on a UNIQUELY NAMED temp file, THEN swap it in.
+    # uuid suffix means two concurrent writers for the same asset never clobber each other's draft.
+    # corruption is for politicians, not our files
     raw = json.dumps(data, ensure_ascii=False).encode("utf-8")
-    tmp = path.with_suffix(".tmp")
+    uid = uuid.uuid4().hex[:12]  # 12 hex chars — astronomically unlikely to collide. unlike my trades
+    tmp = path.with_name(f"{path.stem}.{uid}.tmp")
     try:
+        os.makedirs(path.parent, exist_ok=True)  # directory must exist. no excuses. no FileNotFoundError
         with gzip.open(tmp, "wb", compresslevel=6) as fh:
             fh.write(raw)
-        os.replace(tmp, path)  # atomic on POSIX; best-effort on Windows. good enough
+        if tmp.exists():  # belt AND suspenders — only replace if the temp actually landed
+            os.replace(tmp, path)  # atomic on POSIX; best-effort on Windows. still better than nothing
+        else:
+            raise FileNotFoundError(f"Temp file vanished before replace: {tmp}")
     except Exception:
         try:
             tmp.unlink(missing_ok=True)  # clean up the evidence before we raise
@@ -76,6 +97,45 @@ def _write_gz(path: Path, data: dict) -> None:
 
 # Public API
 # what can I say? I am a cheap man.
+
+# thresholds for "has anything actually changed enough to bother rewriting"
+_PRICE_WRITE_THRESHOLD  = 0.01   # ignore sub-cent price drift
+_SCORE_WRITE_THRESHOLD  = 0.5    # ignore signal score wobble below 0.5
+
+
+def _snapshot_unchanged(path: Path, new_data: dict) -> bool:
+    """
+    Return True if the on-disk snapshot is close enough to *new_data* that
+    rewriting would be pointless.  Falls back to False (always write) on any
+    read error — better to write once too many than to skip a real update.
+    """
+    if not path.exists():
+        return False
+    try:
+        existing = _read_gz(path)
+    except (OSError, ValueError):
+        return False  # corrupted existing file — overwrite it. no mercy
+
+    # qualitative fields: any change → write immediately
+    if existing.get("signal_label") != new_data.get("signal_label"):
+        return False
+    if existing.get("trend") != new_data.get("trend"):
+        return False
+
+    # price: only skip if movement is trivial
+    ep = float(existing.get("price") or 0.0)
+    np_ = float(new_data.get("price") or 0.0)
+    if abs(ep - np_) > _PRICE_WRITE_THRESHOLD:
+        return False
+
+    # signal score: only skip if delta is noise
+    es = float(existing.get("signal_score") or 0.0)
+    ns = float(new_data.get("signal_score") or 0.0)
+    if abs(es - ns) > _SCORE_WRITE_THRESHOLD:
+        return False
+
+    return True  # nothing meaningful changed. we are too lazy to write. and that is correct
+
 
 def save_snapshot(
     asset_name: str,
@@ -124,11 +184,18 @@ def save_snapshot(
         "headlines":      headlines,
     }
 
-    try:
-        _write_gz(path, snapshot)
-        log.debug("Saved snapshot: %s", path.name)
-    except Exception as exc:
-        log.warning("Snapshot write failed for %s: %s", asset_name, exc)
+    # skip the write if nothing meaningful has changed — stop thrashing the disk for no reason
+    if _snapshot_unchanged(path, snapshot):
+        log.debug("Snapshot unchanged for %s — skipping write.", asset_name)
+        return
+
+    # one writer per asset at a time. no queue jumping, no temp-file collisions
+    with _get_asset_lock(asset_name):
+        try:
+            _write_gz(path, snapshot)
+            log.debug("Saved snapshot: %s", path.name)
+        except Exception as exc:
+            log.warning("Snapshot write failed for %s: %s", asset_name, exc)
 
 
 def load_snapshots(asset_name: str, days: int = 30) -> list[dict]:
