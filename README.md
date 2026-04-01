@@ -11,6 +11,8 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
 [![Disclaimer](https://img.shields.io/badge/Disclaimer-Not%20Financial%20Advice-red?style=flat-square)](DISCLAIMER.md)
 
+_LINK TO LIVE DEPLOYMENT: [HERE!!!](https://lemarketintelligenceplatform-vsr4ernrtqqduydam2onapp.streamlit.app/)_
+
 ---
 
 A real-time market analysis dashboard that combines technical price indicators, multi-source news sentiment, and event-driven signal generation into a single composite score for 24 tracked assets across commodities, cryptocurrencies, technology equities, and market indices.
