@@ -298,8 +298,11 @@ CACHE_TTL_SECONDS = 300        # legacy fallback (unused directly)
 PRICE_CACHE_TTL   = 90         # prices / metrics  → refresh ~every 1–2 min
 NEWS_CACHE_TTL    = 300        # news articles      → refresh ~every 5 min
 REQUEST_TIMEOUT = 20
-MAX_RETRIES = 2
-MAX_WORKERS = 8          # parallel threads for fetching — why not 9? what can i say, i am a cheap man
+MAX_RETRIES = 3                  # three strikes before we give up. very democratic
+MAX_WORKERS = 4                  # news feed threads — reduced from 8, turns out being antisocial gets you banned
+PRICE_FETCH_WORKERS = 3          # yfinance parallel workers — Yahoo has feelings too, apparently
+YFINANCE_REQUEST_DELAY = 0.75    # seconds to sleep after each yfinance call. be polite. be very polite
+YFINANCE_BACKOFF_BASE  = 1.0     # base seconds for exponential backoff. 1s → 2s → 4s. regret compounds
 
 #  9. SOURCE CREDIBILITY WEIGHTS
 #     Applied as a multiplier to relevance scores.
