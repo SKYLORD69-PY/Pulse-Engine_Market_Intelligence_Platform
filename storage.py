@@ -16,6 +16,7 @@ import datetime as dt
 import gzip
 import json
 import logging
+import os
 from pathlib import Path
 
 from config import (
@@ -57,9 +58,20 @@ def _read_gz(path: Path) -> dict:
 
 
 def _write_gz(path: Path, data: dict) -> None:
+    # atomic write: scribble on a temp file, THEN swap it in. like sending a rough draft to
+    # the printer but only stapling the final copy. corruption is for politicians, not our files
     raw = json.dumps(data, ensure_ascii=False).encode("utf-8")
-    with gzip.open(path, "wb", compresslevel=6) as fh:
-        fh.write(raw)
+    tmp = path.with_suffix(".tmp")
+    try:
+        with gzip.open(tmp, "wb", compresslevel=6) as fh:
+            fh.write(raw)
+        os.replace(tmp, path)  # atomic on POSIX; best-effort on Windows. good enough
+    except Exception:
+        try:
+            tmp.unlink(missing_ok=True)  # clean up the evidence before we raise
+        except OSError:
+            pass
+        raise
 
 
 # Public API
