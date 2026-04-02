@@ -128,8 +128,8 @@ flowchart TD
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Codex-Crusader/market-intelligence-platform.git
-cd market-intelligence-platform
+git clone https://github.com/Codex-Crusader/le_Market_Intelligence_Platform.git
+cd le_Market_Intelligence_Platform
 
 # 2. Create and activate a virtual environment
 python -m venv .venv
