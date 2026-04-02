@@ -352,8 +352,8 @@ market-intelligence-platform/
 
 Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. All contributors must follow the code style and testing requirements described there.
 
-[![Open Issues](https://img.shields.io/github/issues/your-username/market-intelligence-platform?style=flat-square)](https://github.com/your-username/market-intelligence-platform/issues)
-[![Pull Requests](https://img.shields.io/github/issues-pr/your-username/market-intelligence-platform?style=flat-square)](https://github.com/your-username/market-intelligence-platform/pulls)
+[![Open Issues](https://img.shields.io/github/issues/Codex-Crusader/le_Market_Intelligence_Platform?style=flat-square)](https://github.com/Codex-Crusader/le_Market_Intelligence_Platform/issues)
+[![Pull Requests](https://img.shields.io/github/issues-pr/Codex-Crusader/le_Market_Intelligence_Platform?style=flat-square)](https://github.com/Codex-Crusader/le_Market_Intelligence_Platform/pulls)
 
 ---
 
