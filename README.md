@@ -149,6 +149,17 @@ The dashboard opens at `http://localhost:8501`. A full-market background scan st
 
 ---
 
+## Quick Start (Docker)
+
+```bash
+docker build -t market-intel .
+docker run -p 8501:8501 market-intel
+```
+
+Dashboard available at `http://localhost:8501`.
+
+---
+
 ## Installation
 
 ### Requirements
