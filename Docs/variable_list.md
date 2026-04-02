@@ -64,8 +64,12 @@ This document lists every significant constant, module-level variable, function 
 | `PRICE_CACHE_TTL` | `int` | 90 | TTL in seconds for `@st.cache_data` on price history and metrics functions. |
 | `NEWS_CACHE_TTL` | `int` | 300 | TTL in seconds for `@st.cache_data` on news fetching. |
 | `REQUEST_TIMEOUT` | `int` | 20 | HTTP timeout in seconds applied to all RSS feed fetch requests. |
-| `MAX_RETRIES` | `int` | 2 | Number of retry attempts for failed Yahoo Finance requests. |
-| `MAX_WORKERS` | `int` | 8 | Thread pool size for parallel data fetching (news feeds, peer prices). |
+| `MAX_RETRIES` | `int` | 3 | Number of retry attempts for failed Yahoo Finance requests. |
+| `MAX_WORKERS` | `int` | 4 | Thread pool size for parallel news fetching. |
+| `PRICE_FETCH_WORKERS` | `int` | 3 | Thread pool size specifically for parallel Yahoo Finance price fetches and `run_full_scan`. |
+| `YFINANCE_REQUEST_DELAY` | `float` | 0.75 | Base delay in seconds between Yahoo Finance requests to avoid rate limiting. |
+| `YFINANCE_BACKOFF_BASE` | `float` | 1.0 | Multiplier base for exponential backoff on retried Yahoo Finance requests. |
+| `CACHE_TTL_SECONDS` | `int` | 300 | General-purpose cache TTL in seconds (same value as `NEWS_CACHE_TTL`). |
 
 ### 7. Source Credibility Weights
 
@@ -114,7 +118,12 @@ This document lists every significant constant, module-level variable, function 
 |---|---|---|
 | `VADER_AVAILABLE` | `bool` | Set to `True` if `vaderSentiment` imported successfully, `False` if fallback keyword scoring is used. |
 | `STORAGE_AVAILABLE` | `bool` | Set to `True` if `storage.save_snapshot` imported successfully. |
-| `_save_snapshot` | `Callable` | Alias for `storage.save_snapshot`, or a no-op lambda if storage is unavailable. |
+| `_save_snapshot` | `Callable` | Alias for `storage.save_snapshot`, or a no-op if storage is unavailable. |
+| `_vader` | `SentimentIntensityAnalyzer \| None` | VADER analyzer instance. `None` if `vaderSentiment` is not installed. |
+| `_yf_semaphore` | `threading.Semaphore` | Semaphore with `PRICE_FETCH_WORKERS` permits to limit concurrent Yahoo Finance requests. |
+| `_FINANCE_LEXICON` | `dict[str, float]` | Custom financial sentiment words with signed weights, injected into VADER. 55+ entries. |
+| `_POS_WORDS` | `frozenset[str]` | 17 positive financial terms used by the keyword fallback sentiment scorer. |
+| `_NEG_WORDS` | `frozenset[str]` | 25 negative financial terms used by the keyword fallback sentiment scorer. |
 | `log` | `logging.Logger` | Module-level logger named after `__name__`. |
 
 ### Function Signatures and Return Structures
@@ -173,9 +182,9 @@ Takes no parameters. Returns `list[dict]` where each dict contains:
 | `title` | `str` | Article headline, HTML stripped |
 | `summary` | `str` | Article body excerpt, HTML stripped, max 600 chars |
 | `source` | `str` | Feed name matching a key in `SOURCE_WEIGHTS` |
-| `pub_date` | `Optional[datetime]` | Publication datetime (UTC) |
+| `published` | `Optional[datetime]` | Publication datetime (UTC) |
 | `sentiment` | `dict` | Output of `score_sentiment` |
-| `url` | `str` | Article link |
+| `link` | `str` | Article URL |
 
 ---
 
@@ -198,10 +207,51 @@ Returns `list[dict]` — same structure as `fetch_news_articles` output, filtere
 
 | Key | Type | Description |
 |---|---|---|
-| `relevance_score` | `float` | Weighted keyword match score, boosted by recency and source credibility |
-| `events_detected` | `list[str]` | Event category labels from `detect_events` |
+| `relevance_score` | `float` | Final weighted score after source credibility multiplier |
+| `base_score` | `float` | Raw keyword match score before source weighting |
+| `source_weight` | `float` | Source credibility multiplier applied from `SOURCE_WEIGHTS` |
+| `events_detected` | `list[dict]` | Event dicts from `detect_events`, each with `event_key`, `label`, `icon`, `matched_kw` |
 
 Sorted descending by `relevance_score`.
+
+---
+
+#### `detect_events(text)`
+
+| Parameter | Type | Description |
+|---|---|---|
+| `text` | `str` | Combined title + summary text, lowercased |
+
+Returns `list[dict]` where each dict contains:
+
+| Key | Type | Description |
+|---|---|---|
+| `event_key` | `str` | Event category identifier from `EVENT_TRIGGERS` |
+| `label` | `str` | Human-readable event label |
+| `icon` | `str` | Display icon for the event |
+| `matched_kw` | `list[str]` | Keywords that triggered this event detection |
+
+---
+
+#### `cluster_articles(articles)`
+
+| Parameter | Type | Description |
+|---|---|---|
+| `articles` | `list[dict]` | Correlated article list (output of `correlate_news`) |
+
+Returns `dict[str, list[dict]]` — articles grouped by detected event type. Ungrouped articles appear under a `"general"` key.
+
+---
+
+#### `get_display_clusters(news, max_clusters, min_relevance)`
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `news` | `list[dict]` | — | Correlated article list |
+| `max_clusters` | `int` | `2` | Maximum number of clusters to return |
+| `min_relevance` | `Optional[float]` | `None` | Minimum relevance threshold filter |
+
+Returns `dict` — top clusters from `cluster_articles` limited to `max_clusters` entries.
 
 ---
 
@@ -213,7 +263,9 @@ Returns `dict`:
 |---|---|---|
 | `score` | `float` | Composite score clamped to -10.0 to +10.0 |
 | `label` | `str` | Human-readable label from `SIGNAL_THRESHOLDS` |
-| `components` | `dict[str, float]` | Per-component contributions before clamping |
+| `components` | `dict[str, float]` | Per-component contributions after class-weight multiplication |
+| `raw_components` | `dict[str, float]` | Per-component raw values before weight multiplication |
+| `category` | `Optional[str]` | Asset category passed through for downstream reference |
 
 ---
 
@@ -231,7 +283,7 @@ Returns `dict`:
 
 ---
 
-#### `build_explanation(asset_name, metrics, news, market_ctx, momentum, signal)`
+#### `build_explanation(asset_name, metrics, related_news, market_ctx, momentum, signal)`
 
 Returns `dict`:
 
@@ -241,12 +293,22 @@ Returns `dict`:
 | `why_it_matters` | `str` | Contextual significance paragraph |
 | `detail` | `str` | Full markdown narrative with all contributing factors |
 | `confidence` | `str` | `"high"`, `"medium"`, or `"low"` |
+| `confidence_info` | `dict` | Output of `_assess_confidence` with `level`, `score`, `reasons`, `increases`, `decreases` |
 | `factors` | `list[dict]` | List of factor dicts each with `type`, `label`, `detail` keys |
-| `contradictions` | `list[str]` | Human-readable list of detected signal conflicts |
+| `contradictions` | `list[dict]` | List of contradiction dicts each with `type` and `description` keys |
 
 ---
 
-#### `analyse_asset(asset_name, ticker, category, articles, with_market_ctx)`
+#### `analyse_asset(asset_name, ticker, category, articles, with_market_ctx, save)`
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `asset_name` | `str` | — | Asset display name |
+| `ticker` | `str` | — | Yahoo Finance ticker |
+| `category` | `str` | — | Asset category |
+| `articles` | `list[dict]` | — | Pre-fetched article pool |
+| `with_market_ctx` | `bool` | `False` | Whether to run `analyse_market_context` |
+| `save` | `bool` | `False` | Whether to persist a snapshot via `save_snapshot`. Only the batch scan pipeline passes `True`. |
 
 Returns `dict`:
 
@@ -265,7 +327,43 @@ Returns `dict`:
 
 ---
 
+#### `fetch_all_metrics_parallel(days)`
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `days` | `int` | `LOOKBACK_DAYS` | Calendar days of price history to fetch |
+
+Fetches price metrics and momentum for every tracked asset in parallel using `PRICE_FETCH_WORKERS` threads. Returns `dict`:
+
+```
+{category: {asset_name: {"metrics": <price_metrics_dict>, "momentum": <momentum_dict>}}}
+```
+
+Used by `dashboard.cached_all_metrics()` to populate the market heatmap and category overview.
+
+---
+
+#### `run_full_scan()`
+
+Takes no parameters. Fetches news once, then analyses every tracked asset in parallel using `PRICE_FETCH_WORKERS` threads with `with_market_ctx=True`. Does **not** persist snapshots (passes `save=False`). Returns:
+
+```
+{category: {asset_name: <analyse_asset_result_dict>}}
+```
+
+---
+
 ## dashboard.py — Session State, Singleton State, and UI Variables
+
+### Module-Level
+
+| Name | Type | Description |
+|---|---|---|
+| `BACKTEST_AVAILABLE` | `bool` | `True` if `backtest` module imported successfully. |
+| `STORAGE_AVAILABLE` | `bool` | `True` if `storage.get_historical_features` imported successfully. |
+| `_EGG_LIMIT` | `int` | Click count threshold for the easter egg (5). |
+| `_EGG_WINDOW` | `float` | Time window in seconds for easter egg click detection (2.0 s). |
+| `_EGG_URL` | `str` | URL opened when the easter egg triggers. |
 
 ### Singleton Scan State (via `@st.cache_resource`)
 
@@ -290,7 +388,17 @@ Returns `dict`:
 |---|---|---|
 | `cached_news()` | `NEWS_CACHE_TTL` (300 s) | Deduplicated article list from all 12 feeds |
 | `cached_history(symbol)` | `PRICE_CACHE_TTL` (90 s) | OHLCV DataFrame for the given ticker |
-| `cached_all_metrics()` | `PRICE_CACHE_TTL` (90 s) | Nested dict `{category: {asset_name: {metrics: ..., momentum: ...}}}` |
+| `cached_all_metrics()` | `PRICE_CACHE_TTL` (90 s) | Nested dict `{category: {asset_name: {metrics: ..., momentum: ...}}}` via `fetch_all_metrics_parallel` |
+
+### UI Helper Functions
+
+| Function | Description |
+|---|---|
+| `_render_article(item)` | Renders a single correlated news article card in the dashboard |
+| `_mover_html(items, color)` | Returns an HTML string for a top-movers row in the heatmap |
+| `_color_pct(val)` | Returns a colour-coded HTML span for a percentage change value |
+| `_color_rsi(val)` | Returns a colour-coded HTML span for an RSI value |
+| `_auto_refresher()` | `@st.fragment` — handles the 90-second auto-refresh countdown and `st.rerun` trigger |
 
 ### Per-Rerun Variables (main panel)
 
@@ -324,7 +432,11 @@ Returns `dict`:
 | Name | Type | Description |
 |---|---|---|
 | `_storage_path` | `pathlib.Path` | Resolved path to `STORAGE_DIR`. |
-| `_REDUCED_FIELDS` | `set[str]` | Set of field names retained in reduced-detail snapshots. |
+| `_asset_locks` | `dict[str, threading.Lock]` | Per-asset write locks to prevent concurrent snapshot writes for the same asset. |
+| `_asset_locks_mutex` | `threading.Lock` | Guards access to `_asset_locks` dict during lock creation. |
+| `_REDUCED_FIELDS` | `frozenset[str]` | Field names retained in reduced-detail snapshots. |
+| `_PRICE_WRITE_THRESHOLD` | `float` | Minimum absolute price change (0.01) required to rewrite an existing snapshot for the same day. |
+| `_SCORE_WRITE_THRESHOLD` | `float` | Minimum absolute signal score change (0.5) required to rewrite an existing snapshot for the same day. |
 | `log` | `logging.Logger` | Module logger. |
 
 ### Snapshot Dict Structure (full detail)
@@ -351,6 +463,13 @@ Returns `dict`:
 
 `asset`, `date`, `price`, `change_1d`, `signal_score`, `signal_label`, `trend`, `rsi`, `roc_10d`, `trend_strength`
 
+### Additional Functions
+
+| Function | Description |
+|---|---|
+| `load_snapshots(asset_name, days=30)` | Returns `list[dict]` of all snapshots for the asset within the last `days` calendar days |
+| `list_tracked_assets_with_history()` | Returns sorted `list[str]` of asset names that have at least one stored snapshot |
+
 ### `get_historical_features(asset_name)` Return Structure
 
 | Key | Type | Description |
@@ -363,6 +482,20 @@ Returns `dict`:
 ---
 
 ## scan.py — Return Structures
+
+### Module-Level
+
+| Name | Type | Description |
+|---|---|---|
+| `_SUMMARY_FILE` | `pathlib.Path` | Path to `market_data/_scan_summary.json.gz` — the persistent scan summary written after each run. |
+| `log` | `logging.Logger` | Module logger. |
+
+### `run_scan(verbose, dry_run)` Parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `verbose` | `bool` | `True` | Log per-asset progress lines |
+| `dry_run` | `bool` | `False` | Run the full pipeline but skip all file writes |
 
 ### `run_scan()` Return Structure
 
@@ -391,9 +524,21 @@ Returns `dict`:
 | `confidence` | `Optional[str]` | Explanation confidence level |
 | `verdict` | `str` | One-line summary string |
 
+### `load_last_scan_summary()` Return Structure
+
+Returns the dict written by the most recent `run_scan()` call (same structure as `run_scan` return), or an empty dict `{}` if no summary file exists.
+
 ---
 
 ## backtest.py — Return Structures
+
+### Module-Level
+
+| Name | Type | Description |
+|---|---|---|
+| `_STRONG_THRESHOLD` | `float` | 6.0 — minimum `abs(signal_score)` for the `strong` bucket. |
+| `_MODERATE_THRESHOLD` | `float` | 3.0 — minimum `abs(signal_score)` for the `moderate` bucket. Scores below this are `weak`. |
+| `log` | `logging.Logger` | Module logger. |
 
 ### `evaluate_signal_accuracy(asset_name, lookback)` Return Structure
 
@@ -401,11 +546,16 @@ Returns `dict`:
 |---|---|---|
 | `hit_rate` | `Optional[float]` | Fraction of correct directional predictions. None if fewer than 2 pairs available |
 | `num_evaluated` | `int` | Number of signal-outcome pairs evaluated |
-| `details` | `list[dict]` | Per-pair records sorted newest-first |
+| `details` | `list[dict]` | Per-pair records sorted newest-first. Each dict has `date`, `signal_score`, `signal_label`, `predicted`, `actual_change`, `actual`, `correct` |
 | `avg_signal_score` | `Optional[float]` | Mean absolute signal score across evaluated pairs |
-| `by_signal_strength` | `dict` | Hit rate and count broken down by `strong`, `moderate`, `weak` |
+| `message` | `str` | Human-readable result summary string |
+| `by_signal_strength` | `dict` | Hit rate and count broken down by `strong`, `moderate`, `weak` buckets |
 | `by_label` | `dict` | Hit rate and count per signal label |
 | `label_summaries` | `list[str]` | Human-readable text summaries per label |
+
+### `evaluate_all_assets(lookback)` Return Structure
+
+Returns `dict[str, dict]` — one `evaluate_signal_accuracy` result per asset name, each extended with a `category` key.
 
 ### `get_signal_streak(details)` Return Structure
 
