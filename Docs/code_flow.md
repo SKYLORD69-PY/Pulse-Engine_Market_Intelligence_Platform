@@ -45,29 +45,33 @@ flowchart TD
 
 ## 2. Background Full-Market Scan
 
-The background scan processes all 24 tracked assets sequentially. News is fetched once and reused for all assets. Per-asset snapshots are saved to disk after each asset completes.
+`_run_background_scan` delegates entirely to `scan.run_scan()`. News is fetched once and reused across all 24 assets processed sequentially. Per-asset snapshots are saved via `analyse_asset(save=True)`.
 
 ```mermaid
 flowchart TD
     ENTRY([_run_background_scan thread starts]) --> SETRUNNING[state running = True\nstate error = empty\nstate assets_done = 0]
 
-    SETRUNNING --> FETCHNEWS[fetch_news_articles\nall 12 RSS feeds in parallel\ndeduplication applied]
+    SETRUNNING --> RUNSCAN[scan.run_scan\nverbose=False]
+
+    RUNSCAN --> FETCHNEWS[fetch_news_articles\nall 12 RSS feeds in parallel\ndeduplication applied]
 
     FETCHNEWS --> LOOPSTART{Next asset in\nTRACKED_ASSETS?}
 
-    LOOPSTART -->|More assets| ANALYSE[analyse_asset\nasset_name ticker category articles\nwith_market_ctx=False]
+    LOOPSTART -->|More assets| ANALYSE[analyse_asset\nasset_name ticker category articles\nwith_market_ctx=False\nsave=True]
     LOOPSTART -->|All done| SUMMARY
 
     ANALYSE --> ASUCCESS{Success?}
     ASUCCESS -->|Yes — extract fields| ENTRY_DICT[Build entry dict\nticker signal_score price\nchange_1d trend rsi verdict]
     ASUCCESS -->|Exception| ERRLOG[Log error\nappend to errors list]
 
-    ENTRY_DICT --> SNAPSHOT[save_snapshot called\ninside analyse_asset\nwrites AssetName_YYYYMMDD.json.gz]
+    ENTRY_DICT --> SNAPSHOT[save_snapshot called inside\nanalyse_asset when save=True\nwrites AssetName_YYYYMMDD.json.gz]
     ERRLOG --> LOOPSTART
     SNAPSHOT --> LOOPSTART
 
     SUMMARY[_save_summary\nwrites _scan_summary.json.gz] --> RETENTION[apply_retention_policy\ncleanup_old_snapshots]
-    RETENTION --> DONE[state running = False\nstate assets_done = succeeded count\nlock released]
+    RETENTION --> SCANRET[run_scan returns\nsummary dict]
+
+    SCANRET --> DONE[state running = False\nstate assets_done = summary.succeeded\nlock released]
     DONE --> EXIT([Thread exits])
 ```
 
@@ -420,12 +424,40 @@ flowchart TD
 
     SIGNAL[compute_signal_score\nmetrics momentum news\nmarket_ctx category] --> EXPLAIN[build_explanation]
 
-    EXPLAIN --> STORAGE_CHECK{STORAGE_AVAILABLE?}
+    EXPLAIN --> STORAGE_CHECK{save=True\nand STORAGE_AVAILABLE?}
     STORAGE_CHECK -->|Yes| SNAP[_save_snapshot\nsilent on error]
-    STORAGE_CHECK -->|No| SKIP_SNAP[Skip]
+    STORAGE_CHECK -->|No| SKIP_SNAP[Skip\ndashboard calls use save=False]
 
     SNAP --> HIST
     SKIP_SNAP --> HIST
 
     HIST[get_historical_features\nfrom stored snapshots] --> RETURN([Return full result dict])
+```
+
+---
+
+## 14. Parallel Metrics Pre-fetch Pipeline
+
+`fetch_all_metrics_parallel` is called by `dashboard.cached_all_metrics()` to populate the market heatmap and category overview without running the full news/signal pipeline.
+
+```mermaid
+flowchart TD
+    CALL([fetch_all_metrics_parallel called\ndays=LOOKBACK_DAYS]) --> BUILDTASKS[Build task list\nall category+asset+ticker triples]
+
+    BUILDTASKS --> POOL[ThreadPoolExecutor\nPRICE_FETCH_WORKERS threads]
+
+    POOL --> WORKER[_fetch_one_asset\ncat name tkr days]
+
+    WORKER --> FETCH[fetch_price_history ticker days]
+    FETCH --> PMETRICS[compute_price_metrics]
+    FETCH --> MMETRICS[compute_momentum_metrics]
+
+    PMETRICS --> COLLECT
+    MMETRICS --> COLLECT
+
+    COLLECT[Collect result tuple\ncat name metrics momentum] --> MORE{More futures?}
+    MORE -->|Yes| WORKER
+    MORE -->|Done| ASSEMBLE
+
+    ASSEMBLE[Assemble nested dict\ncategory -> asset -> metrics+momentum] --> RETURN([Return all_results dict])
 ```
