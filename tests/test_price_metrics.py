@@ -1,4 +1,5 @@
 """
+THIS TEST FOLDER IS AI GENERATED AND A PLACEHOLDER. IT WILL BE IMPROVED AND IMPLEMENTED AS IT GOES ON MANUALLY
 test_price_metrics.py — Contract tests for compute_price_metrics() and _classify_trend().
 
 MINIMUM_REQUIRED_KEYS documents the stable output contract.
