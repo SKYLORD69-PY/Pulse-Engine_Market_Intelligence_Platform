@@ -1,4 +1,5 @@
 """
+THIS TEST FOLDER IS AI GENERATED AND A PLACEHOLDER. IT WILL BE IMPROVED AND IMPLEMENTED AS IT GOES ON MANUALLY
 test_dedup_and_clustering.py — Contract tests for _jaccard() and
 deduplicate_articles().
 
