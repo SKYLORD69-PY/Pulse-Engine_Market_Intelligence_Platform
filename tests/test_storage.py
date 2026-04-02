@@ -1,4 +1,5 @@
 """
+THIS TEST FOLDER IS AI GENERATED AND A PLACEHOLDER. IT WILL BE IMPROVED AND IMPLEMENTED AS IT GOES ON MANUALLY.
 test_storage.py — Contract tests for all public storage functions.
 
 All tests use the storage_dir fixture which monkeypatches storage._storage_path
