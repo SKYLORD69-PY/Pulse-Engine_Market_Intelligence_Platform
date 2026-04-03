@@ -98,17 +98,21 @@ def run_scan(verbose: bool = True, dry_run: bool = False) -> dict:
                 expl    = r["explanation"]
 
                 entry = {
-                    "ticker":       ticker,
-                    "signal_score": sig.get("score"),
-                    "signal_label": sig.get("label"),
-                    "price":        metrics.get("latest_price"),
-                    "change_1d":    metrics.get("change_1d"),
-                    "change_7d":    metrics.get("change_7d"),
-                    "trend":        metrics.get("trend"),
-                    "rsi":          mom.get("rsi"),
-                    "roc_10d":      mom.get("roc_10d"),
-                    "confidence":   expl.get("confidence"),
-                    "verdict":      expl.get("verdict", ""),
+                    "ticker":          ticker,
+                    "signal_score":    sig.get("score"),
+                    "signal_label":    sig.get("label"),
+                    "price":           metrics.get("latest_price"),
+                    "change_1d":       metrics.get("change_1d"),
+                    "change_7d":       metrics.get("change_7d"),
+                    "change_30d":      metrics.get("change_30d"),
+                    "volatility":      metrics.get("volatility"),
+                    "trend":           metrics.get("trend"),
+                    "rsi":             mom.get("rsi"),
+                    "roc_10d":         mom.get("roc_10d"),
+                    "trend_strength":  mom.get("trend_strength"),
+                    "momentum_accel":  mom.get("momentum_accel"),
+                    "confidence":      expl.get("confidence"),
+                    "verdict":         expl.get("verdict", ""),
                 }
                 results[category][asset_name] = entry
 
