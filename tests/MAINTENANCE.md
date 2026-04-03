@@ -45,11 +45,9 @@ All imports from `app.py` (and future split modules) live in the `try/except` bl
 top of `conftest.py`. No test file imports directly from `app`, `storage`, etc.
 
 **When issue #4 lands (app.py split into focused modules):**
-1. Open `conftest.py`
-2. Fill in the post-refactor module paths in the `except ImportError` block
-3. Remove the `raise` at the end of that block
-4. Update `APP_MODULE = "app"` to the module that calls `fetch_price_history`
-5. Run `pytest` — all 14 tests should pass with no other changes
+1. Update the imports at the top of `conftest.py` to point to the new modules
+2. Update the `"app.fetch_price_history"` and `"app.fetch_news_articles"` patch strings in `conftest.py` and `test_pipeline.py` to match the new module that owns those functions
+3. Run `pytest` — all 14 tests should pass with no other changes
 
 ---
 
@@ -61,7 +59,7 @@ top of `conftest.py`. No test file imports directly from `app`, `storage`, etc.
 | `analyse_asset()` top-level keys renamed | Update `test_pipeline.py::test_analyse_asset_has_signal_in_range` |
 | RSI/ROC formula replaced | `test_core.py` invariant tests will catch a broken range; direction tests catch sign flip |
 | Signal score clamping removed | `test_signal_score_in_range` will fail — intentional |
-| `fetch_price_history` / `fetch_news_articles` moved to new module | Update `APP_MODULE` in `conftest.py` |
+| `fetch_price_history` / `fetch_news_articles` moved to new module | Update the `"app.*"` patch strings in `conftest.py` and `test_pipeline.py` |
 | New asset class added to `config.py` | No test changes needed — pipeline tests cover all categories via `run_full_scan` |
 
 ---
