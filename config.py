@@ -1,5 +1,5 @@
 """
-config.py — Central configuration for the Market Intelligence Platform.
+config.py — Central configuration for PulseEngine.
 
 Every tunable value lives here. app.py and dashboard.py import from this
 file only — no magic numbers or hardcoded strings elsewhere.
@@ -284,7 +284,7 @@ RELEVANCE_MEDIUM = 3
 
 #  7. DASHBOARD SETTINGS
 
-DASHBOARD_TITLE = "Market Intelligence Platform"
+DASHBOARD_TITLE = "PulseEngine"
 DASHBOARD_ICON = "📊"
 DASHBOARD_LAYOUT = "wide"
 AUTO_REFRESH_SECONDS = 90   # refreshes every 90 seconds. like anxiety but automated and on a schedule
