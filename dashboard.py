@@ -521,20 +521,13 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("**Top Movers — 24h**")  # winners and losers. wall street in 10 rows
 
 with st.sidebar:
-    movers: list[dict] = []
-    for cat, cat_assets in _summary_results.items():
-        for name, data in cat_assets.items():
-            chg = data.get("change_1d")
-            if chg is not None:
-                movers.append({"name": name, "cat": cat, "chg": chg})
+    _top_movers = _summary.get("top_movers", {})
+    gainers     = _top_movers.get("gainers", [])
+    losers      = _top_movers.get("losers", [])
 
-    if not movers:
+    if not gainers and not losers:
         st.caption("No scan data yet — run a full scan to see top movers.")
     else:
-        movers_sorted = sorted(movers, key=lambda x: x["chg"], reverse=True)
-        gainers = movers_sorted[:5]
-        losers  = movers_sorted[-5:][::-1]
-
         def _mover_html(items: list[dict], color: str) -> str:
             return "".join(
                 f'<div class="mover-row">'
@@ -1141,28 +1134,11 @@ with st.expander("Price Chart & Live Analysis", expanded=False):
 st.markdown("---")
 st.markdown("## Market Heatmap — 24h Changes")
 
-cats_for_heatmap = list(TRACKED_ASSETS.keys())
-max_assets       = max(len(TRACKED_ASSETS[c]) for c in cats_for_heatmap)
-z_matrix:    list[list] = []
-text_matrix: list[list] = []
-
-for cat in cats_for_heatmap:
-    cat_asset_names = list(TRACKED_ASSETS[cat].keys())
-    row_z:    list = []
-    row_text: list = []
-    for name in cat_asset_names:
-        chg = _summary_results.get(cat, {}).get(name, {}).get("change_1d")
-        if chg is not None:
-            row_z.append(round(chg, 2))
-            row_text.append(f"{name}<br>{chg:+.1f}%")
-        else:
-            row_z.append(0)
-            row_text.append(name)
-    while len(row_z) < max_assets:
-        row_z.append(None)
-        row_text.append("")
-    z_matrix.append(row_z)
-    text_matrix.append(row_text)
+_heatmap         = _summary.get("heatmap", {})
+cats_for_heatmap = _heatmap.get("categories", list(TRACKED_ASSETS.keys()))
+max_assets       = _heatmap.get("max_assets", 1)
+z_matrix         = _heatmap.get("z", [])
+text_matrix      = _heatmap.get("text", [])
 
 hm_fig = go.Figure(go.Heatmap(
     z=z_matrix,
@@ -1205,25 +1181,9 @@ st.caption(_hm_caption)
 
 st.markdown("---")
 with st.expander("Category Overview", expanded=False):
-    _cat_summary = _summary_results.get(selected_category, {})
-    rows = []
-
-    missing_names: list[str] = []
-    for name in TRACKED_ASSETS[selected_category]:
-        asset_snap = _cat_summary.get(name, {})
-        if asset_snap.get("price") is not None:
-            rows.append({
-                "Asset":   name,
-                "Signal":  asset_snap.get("signal_label", "—"),
-                "Price":   asset_snap.get("price", 0),
-                "24h %":   asset_snap.get("change_1d", 0) or 0,
-                "7d %":    asset_snap.get("change_7d", 0) or 0,
-                "Trend":   asset_snap.get("trend", "?"),
-                "RSI":     float(asset_snap.get("rsi") or 50.0),
-                "10d ROC": float(asset_snap.get("roc_10d") or 0.0),
-            })
-        else:
-            missing_names.append(name)
+    _cat_data     = _summary.get("category_rows", {}).get(selected_category, {})
+    rows          = _cat_data.get("rows", [])
+    missing_names = _cat_data.get("missing", [])
 
     if rows:
         df = pd.DataFrame(rows)
