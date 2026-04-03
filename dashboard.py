@@ -1,5 +1,5 @@
 """
-dashboard.py — Streamlit dashboard for the Market Intelligence Platform.
+dashboard.py — Streamlit dashboard for PulseEngine.
 
 Run with:  streamlit run dashboard.py
 
@@ -1209,7 +1209,7 @@ _auto_refresher()
 
 st.markdown("---")
 st.caption(
-    "Market Intelligence Platform  ·  "
+    "PulseEngine  ·  "
     "Yahoo Finance (prices) + Public RSS (news) + VADER (sentiment)  ·  "
     "This is not financial advice."
 )
