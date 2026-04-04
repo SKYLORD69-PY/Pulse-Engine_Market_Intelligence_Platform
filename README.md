@@ -13,7 +13,7 @@
 
 _LINK TO LIVE DEPLOYMENT: [HERE!!!!](https://pulseengine.streamlit.app/)_
 
-![dashboard1](https://github.com/user-attachments/assets/efe48c7c-8acb-40c7-8cea-2ece6d4ab30c)
+![updated_dashboard](https://github.com/user-attachments/assets/9acc3ce5-555d-4e9c-b0ac-dbe9b6886282)
 
 ---
 
