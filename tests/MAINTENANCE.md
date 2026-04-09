@@ -1,7 +1,7 @@
 # Test Suite Maintenance Guide
 
-The test suite is intentionally small. Its job is to be a **safety net, not a straitjacket** —
-catch crashes and broken invariants, not enforce exact output shapes.
+The test suite is intentionally pragmatic. Its job is to be a **safety net, not a straitjacket**:
+catch crashes, broken invariants, and pipeline regressions without freezing internal implementation details.
 
 ---
 
@@ -10,32 +10,34 @@ catch crashes and broken invariants, not enforce exact output shapes.
 | File | Purpose |
 |---|---|
 | `conftest.py` | Shared fixtures (price series, DataFrames, articles, signal dicts, mocks) |
-| `test_core.py` | 8 sanity / invariant tests for pure functions |
-| `test_pipeline.py` | 6 smoke tests for end-to-end pipelines |
+| `test_core.py` | Core sanity/invariant tests for pure functions |
+| `test_pipeline.py` | Smoke tests for end-to-end orchestration |
+| `test_logic_coverage.py` | Additional edge coverage for scoring, sentiment, dedup, contradictions |
+| `test_storage_and_scan.py` | Storage retention/cleanup, round-trip, dry-run scan, synthetic backtest |
 
-**Total: 14 tests.** Keep it close to this number. If a new test enforces an exact value or
-a specific dict key, it probably does not belong here.
+The suite is no longer fixed to a tiny count. Add tests when they improve confidence on important logic.
 
 ---
 
 ## What each test file covers
 
-### `test_core.py`
-Pure functions only. Each test checks either:
+### `test_core.py` and `test_logic_coverage.py`
+Pure logic tests. These should verify either:
 - The function runs without crashing, or
-- A hard mathematical invariant (RSI ∈ [0, 100], compound ∈ [-1, 1], score ∈ [-10, 10])
+- A hard invariant/range, or
+- A stable business rule (for example clamping, dedup threshold behavior, or contradiction detection).
 
-These tests survive weight tuning, threshold changes, and key renames as long as the
-invariant itself holds. Do not add tests here that assert exact float values.
+Prefer robust assertions over fragile full-structure snapshots.
 
-### `test_pipeline.py`
-Smoke tests for `analyse_asset()` and `run_full_scan()`. All network calls are mocked
-via conftest fixtures. Each test checks only:
-- The pipeline completes without raising, and
-- The result contains a `signal` key with a score in range
+### `test_pipeline.py` and `test_storage_and_scan.py`
+Integration/smoke coverage for:
+- `analyse_asset()` and `run_full_scan()` with network mocked,
+- `run_scan(dry_run=True)` execution,
+- storage read/write/retention behaviors,
+- synthetic backtest evaluation.
 
-Do not add key-structure assertions here. If `analyse_asset` gains new return keys,
-the existing tests should keep passing without modification.
+These tests should avoid enforcing unstable presentation details, but they should assert
+meaningful pipeline outcomes (no crash, sane outputs, expected side effects).
 
 ---
 
@@ -66,22 +68,22 @@ Network calls are mocked at the point of use in `src/engine.py`:
 
 | Change | Action required |
 |---|---|
-| New key added to `analyse_asset()` result | Nothing — tests use `.get()` and check presence only |
-| `analyse_asset()` top-level keys renamed | Update `test_pipeline.py::test_analyse_asset_has_signal_in_range` |
-| RSI/ROC formula replaced | `test_core.py` invariant tests will catch a broken range; direction tests catch sign flip |
-| Signal score clamping removed | `test_signal_score_in_range` will fail — intentional |
-| Functions moved between `src/` modules | Update the `"src.engine.*"` patch strings in `conftest.py` if the moved function is imported by `src/engine.py` |
-| New asset class added to `config/settings.py` | No test changes needed — pipeline tests cover all categories via `run_full_scan` |
+| New key added to `analyse_asset()` result | Usually nothing; avoid strict key snapshots |
+| `analyse_asset()` top-level contract changed | Update smoke expectations in `test_pipeline.py` |
+| RSI/ROC formula replaced | Re-check range/sign invariants and edge-case behavior |
+| Signal score clamping removed | Clamping tests should fail intentionally |
+| Dedup threshold changed | Review boundary tests in `test_logic_coverage.py` |
+| Storage retention windows changed | Review age-based tests in `test_storage_and_scan.py` |
+| Functions moved between `src/` modules | Update patch targets and imports accordingly |
 
 ---
 
 ## Adding a new test
 
 Before adding a test, ask:
-- **Does it test a crash?** Good.
-- **Does it test a range or type invariant?** Good.
-- **Does it assert an exact key name or float value?** Probably bad — it will break on the next refactor.
-- **Would deleting it make refactoring easier?** Then it should not exist.
+- **Does it protect against a real regression risk?** Good.
+- **Does it verify an invariant, edge case, or side effect that matters?** Good.
+- **Is it brittle to harmless refactors?** If yes, simplify it.
 
 ---
 
