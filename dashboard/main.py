@@ -226,7 +226,6 @@ if st.sidebar.button(
             daemon=True,
             name="full-market-scan-manual",
         ).start()
-        st.session_state["_scan_refresh_epoch"] = int(st.session_state.get("_scan_refresh_epoch", 0)) + 1
     st.rerun()
 
 # Top movers
@@ -311,45 +310,46 @@ with st.expander("Price Chart & Live Analysis", expanded=False):
             st.session_state["_live_for"] = ticker
             st.rerun()
     else:
-        history = cached_history(ticker)
-        if history.empty:
-            st.error(
-                f"Could not load price data for **{selected_asset}** (`{ticker}`). "
-                "Yahoo Finance may be temporarily unreachable. Try refreshing."
-            )
-        else:
-            live_metrics  = compute_price_metrics(history)
-            live_momentum = compute_momentum_metrics(history)
+        with st.spinner("Loading live analysis ..."):
+            history = cached_history(ticker)
+            if history.empty:
+                st.error(
+                    f"Could not load price data for **{selected_asset}** (`{ticker}`). "
+                    "Yahoo Finance may be temporarily unreachable. Try refreshing."
+                )
+            else:
+                live_metrics  = compute_price_metrics(history)
+                live_momentum = compute_momentum_metrics(history)
 
-            _live_articles: list[dict] = cached_news() if _news_loaded else []
-            live_news = correlate_news(selected_asset, _live_articles)
+                _live_articles: list[dict] = cached_news() if _news_loaded else []
+                live_news = correlate_news(selected_asset, _live_articles)
 
-            market_ctx = None
-            if run_context and live_metrics.get("change_1d") is not None:
-                with st.spinner("Analysing market context (peers + benchmark) ..."):
-                    try:
-                        market_ctx = analyse_market_context(
-                            selected_asset, selected_category, live_metrics["change_1d"]
-                        )
-                    except Exception as _ctx_exc:
-                        st.warning(
-                            f"Market context analysis failed: {_ctx_exc}",
-                            icon="⚠️",
-                        )
+                market_ctx = None
+                if run_context and live_metrics.get("change_1d") is not None:
+                    with st.spinner("Analysing market context (peers + benchmark) ..."):
+                        try:
+                            market_ctx = analyse_market_context(
+                                selected_asset, selected_category, live_metrics["change_1d"]
+                            )
+                        except Exception as _ctx_exc:
+                            st.warning(
+                                f"Market context analysis failed: {_ctx_exc}",
+                                icon="⚠️",
+                            )
 
-            live_signal = compute_signal_score(
-                live_metrics, live_momentum, live_news, market_ctx,
-                category=selected_category,
-            )
-            live_explanation = build_explanation(
-                selected_asset, live_metrics, live_news, market_ctx,
-                live_momentum, live_signal,
-            )
+                live_signal = compute_signal_score(
+                    live_metrics, live_momentum, live_news, market_ctx,
+                    category=selected_category,
+                )
+                live_explanation = build_explanation(
+                    selected_asset, live_metrics, live_news, market_ctx,
+                    live_momentum, live_signal,
+                )
 
-            ui.render_live_analysis(
-                history, selected_asset, live_signal, live_explanation,
-                snap, is_significant,
-            )
+                ui.render_live_analysis(
+                    history, selected_asset, live_signal, live_explanation,
+                    snap, is_significant,
+                )
 
 # SECTION 13 — Market heatmap
 st.markdown("---")
