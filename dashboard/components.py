@@ -162,6 +162,7 @@ def render_signal_legend_sidebar() -> None:
             Strong Bearish
             """
         )
+        st.caption("Scores are weighted composite signals, not raw price change.")
 
 
 def render_mover_rows(gainers: list[dict], losers: list[dict], summary_date: str) -> None:
