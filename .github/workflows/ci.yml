@@ -11,7 +11,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Keep all main-branch runs so rapid pushes do not leave canceled (red) commit checks.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   # Opt into Node.js 24 for all actions (avoids Node 20 deprecation warnings).
