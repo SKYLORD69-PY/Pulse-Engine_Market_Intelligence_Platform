@@ -9,7 +9,7 @@
 [![News: RSS Feeds](https://img.shields.io/badge/News-12%20RSS%20Feeds-FFA500?style=flat-square)](https://en.wikipedia.org/wiki/RSS)
 [![Assets: 24 Tracked](https://img.shields.io/badge/Assets-24%20Tracked-0ea5e9?style=flat-square)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
-[![Disclaimer](https://img.shields.io/badge/Disclaimer-Not%20Financial%20Advice-red?style=flat-square)](DISCLAIMER.md)
+[![Disclaimer](https://img.shields.io/badge/Disclaimer-Not%20Financial%20Advice-red?style=flat-square)](Docs/DISCLAIMER.md)
 
 Originally Created by *Bhargavaram Krishnapur (Codex-Crusader)*
 
