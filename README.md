@@ -410,8 +410,8 @@ pulse_engine_1/
 | [Docs/code_flow.md](Docs/code_flow.md) | Step-by-step execution flow for every pipeline with Mermaid diagrams |
 | [Docs/variable_list.md](Docs/variable_list.md) | Complete reference of all variables, constants, and return structures |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to report issues, propose changes, and submit pull requests |
-| [DISCLAIMER.md](Docs/DISCLAIMER.md) | Financial, legal, and data accuracy disclaimers |
-| [CHANGELOG.md](Docs/CHANGELOG.md) | All notable changes by version |
+| [Docs/DISCLAIMER.md](Docs/DISCLAIMER.md) | Financial, legal, and data accuracy disclaimers |
+| [Docs/CHANGELOG.md](Docs/CHANGELOG.md) | All notable changes by version |
 | [Docs/ROADMAP.md](Docs/ROADMAP.md) | Project direction, milestones, and contributor lanes |
 
 ---
