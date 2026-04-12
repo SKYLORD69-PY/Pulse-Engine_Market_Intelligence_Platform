@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - Dashboard cache invalidation logic reduced to avoid unnecessary reruns on stale data
 - Dashboard stale-refresh handling tightened — refresh now triggers only when data is genuinely outdated
 - Signal legend copy in sidebar clarified for readability
+- Changelog housekeeping updated on `main` after sync
 
 ### Technical
 - Total test count increased from 14 to 37
