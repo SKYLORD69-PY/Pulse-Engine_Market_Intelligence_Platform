@@ -147,8 +147,15 @@ def _maybe_trigger_scan() -> None:
     ).start()
 
 
-_maybe_trigger_scan()
 
+st.sidebar.checkbox(
+    "Enable auto background scan",
+    value=True,
+    key="_enable_auto_scan"
+)
+
+if st.session_state.get("_enable_auto_scan", True):
+    _maybe_trigger_scan()
 # Rerun once after a background scan completes so the UI picks up fresh data.
 _scan_state = _get_scan_state()
 if (
@@ -159,7 +166,8 @@ if (
     st.session_state["_scan_rerun_done"] = True
     st.session_state["_scan_refresh_epoch"] = int(st.session_state.get("_scan_refresh_epoch", 0)) + 1
     st.rerun()
-
+   
+   
 
 # Load scan summary once per run — needed for scan status display and main content.
 _scan_refresh_epoch = int(st.session_state.get("_scan_refresh_epoch", 0))
@@ -202,7 +210,7 @@ st.sidebar.caption(f"Sentiment engine: {'VADER' if VADER_AVAILABLE else 'Keyword
 st.sidebar.caption(f"Last refresh: {dt.datetime.now().strftime('%H:%M:%S')}")
 
 if st.sidebar.button("Refresh Data"):
-    st.session_state["_scan_refresh_epoch"] = _scan_refresh_epoch + 1
+    st.session_state["_scan_refresh_epoch"] = st.session_state.get("_scan_refresh_epoch", 0) + 1
     st.session_state.pop("_stale_refresh_triggered", None)
     st.rerun()
 
@@ -220,7 +228,7 @@ if st.sidebar.button(
     if not _scan_state["running"] and _scan_state["lock"].acquire(blocking=False):
         _scan_state["last_started"] = time.time()
         _scan_state["running"]      = True
-        st.session_state["_scan_refresh_epoch"] = _scan_refresh_epoch + 1
+        st.session_state["_scan_refresh_epoch"] = st.session_state.get("_scan_refresh_epoch", 0) + 1
         threading.Thread(
             target=_run_background_scan,
             daemon=True,
@@ -251,10 +259,14 @@ st.sidebar.markdown(
 # ── Main panel ─────────────────────────────────────────────────────────────────
 
 _stale = is_data_stale(_summary)
-if _stale and not st.session_state.get("_stale_refresh_triggered", False):
-    st.session_state["_stale_refresh_triggered"] = True
-    st.session_state["_scan_refresh_epoch"] = _scan_refresh_epoch + 1
+if _stale:
+    st.info("Data is stale. Refresh recommended.")
 
+    if st.button("Refresh now"):
+        st.session_state["_scan_refresh_epoch"] = st.session_state.get("_scan_refresh_epoch", 0) + 1
+        st.session_state["_stale_refresh_triggered"] = True
+        st.rerun()
+  
 st.markdown(f"# {selected_asset}")
 st.caption(f"{selected_category}  ·  `{ticker}`  ·  last 30 days")
 
@@ -283,8 +295,8 @@ st.markdown("---")
 if not _news_loaded:
     st.markdown("### Related News")
     if st.button("Load news feed", key="_news_btn"):
-        st.session_state["_news_for"] = ticker
-        st.rerun()
+      st.session_state["_news_for"] = ticker
+      st.rerun()
     st.caption("News is not fetched on startup. Click above to load from 12 RSS feeds.")
 else:
     articles   = cached_news()
@@ -334,7 +346,7 @@ with st.expander("Price Chart & Live Analysis", expanded=False):
                         except Exception as _ctx_exc:
                             st.warning(
                                 f"Market context analysis failed: {_ctx_exc}",
-                                icon="⚠️",
+                                icon="warning",
                             )
 
                 live_signal = compute_signal_score(
