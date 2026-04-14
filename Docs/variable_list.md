@@ -205,6 +205,8 @@ Returns `dict`:
 
 #### `correlate_news(asset_name, articles)`
 
+Keyword matching uses word-boundary regex (`_kw_re`) rather than plain substring containment. This prevents short keywords (e.g. `"gold"`) from matching unrelated text where they appear as a prefix or suffix of a longer word (e.g. `"goldman"`).
+
 Returns `list[dict]` — same structure as `fetch_news_articles` output, filtered and extended with:
 
 | Key | Type | Description |
@@ -354,6 +356,52 @@ Takes no parameters. Fetches news once, then analyses every tracked asset in par
 ```
 {category: {asset_name: <analyse_asset_result_dict>}}
 ```
+
+---
+
+## src/signals.py — Module-Level Constants
+
+| Name | Type | Description |
+|---|---|---|
+| `_KW_PATTERN_CACHE` | `dict[str, re.Pattern]` | Module-level cache of compiled keyword regex patterns, keyed by keyword string. Patterns are built once on first use and reused across all `correlate_news` calls. |
+| `log` | `logging.Logger` | Module-level logger named after `__name__`. |
+
+#### `_kw_re(kw)`
+
+| Parameter | Type | Description |
+|---|---|---|
+| `kw` | `str` | Lowercase keyword string from `ASSET_KEYWORDS` or the auto-appended asset name |
+
+Returns a `re.Pattern` that matches `kw` as a whole token. For keywords ending with an alphanumeric character, the pattern is `\b{escaped_kw}\b`. For keywords ending with a special character (e.g. `opec+`), only a leading `\b` is applied. Results are cached in `_KW_PATTERN_CACHE`.
+
+---
+
+## src/news.py — Module-Level Constants and `generate_keywords`
+
+| Name | Type | Description |
+|---|---|---|
+| `_CORP_SUFFIXES` | `frozenset[str]` | Common corporate suffix words stripped from company name tokens during keyword generation (e.g. `"inc"`, `"corp"`, `"holdings"`, `"technology"`). 18 entries. |
+| `log` | `logging.Logger` | Module-level logger named after `__name__`. |
+
+#### `generate_keywords(ticker)`
+
+| Parameter | Type | Description |
+|---|---|---|
+| `ticker` | `str` | Any valid Yahoo Finance ticker symbol (e.g. `"NVDA"`, `"AAPL"`) |
+
+Fetches company metadata from `yf.Ticker(ticker).info` in a daemon thread bounded by `REQUEST_TIMEOUT`. Falls back to `[ticker]` on timeout, network failure, or unknown ticker (empty `info` dict).
+
+Returns `list[str]` — a deduplicated list of keyword strings, all >= 3 characters, in the following order of precedence:
+
+| Source | Example output |
+|---|---|
+| Ticker symbol | `"NVDA"` |
+| `longName` full string | `"NVIDIA Corporation"` |
+| `longName` tokens (corporate suffixes stripped) | `"NVIDIA"` |
+| `shortName` tokens | `"NVIDIA"` (deduplicated away) |
+| Executive surnames from `companyOfficers` (top 5) | `"Huang"`, `"Kress"` |
+
+Industry and sector fields are intentionally excluded — terms like `"Technology"` are too broad and would cause false-positive matches across unrelated assets.
 
 ---
 

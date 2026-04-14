@@ -171,7 +171,42 @@ flowchart TD
 
 ---
 
-## 6. News Correlation Pipeline
+## 6. Keyword Generation Pipeline
+
+`generate_keywords` is a utility in `src/news.py` that auto-builds a keyword list for any ticker using Yahoo Finance metadata. It is not yet wired into the main scan pipeline — integration is tracked under issue #35 (v0.3 arbitrary ticker support).
+
+```mermaid
+flowchart TD
+    CALL([generate_keywords called\nticker]) --> UPPER[Normalise ticker to uppercase]
+
+    UPPER --> THREAD[Start daemon thread\nthread.join timeout=REQUEST_TIMEOUT]
+
+    THREAD --> FETCH[yf.Ticker ticker .info]
+
+    FETCH --> ALIVE{thread.is_alive\nafter join?}
+    ALIVE -->|Yes — timed out| FALLBACK([Return ticker])
+    ALIVE -->|No| EXCCHECK
+
+    EXCCHECK{Exception\nraised in thread?}
+    EXCCHECK -->|Yes| FALLBACK
+    EXCCHECK -->|No| INFOCHECK
+
+    INFOCHECK{info dict has\nlongName?}
+    INFOCHECK -->|No — unknown ticker| FALLBACK
+    INFOCHECK -->|Yes| BUILD
+
+    BUILD[Add ticker symbol] --> NAMES[Add longName and shortName\nfull string plus individual tokens\nstrip _CORP_SUFFIXES words]
+
+    NAMES --> OFFICERS[Add surnames from\ncompanyOfficers top 5]
+
+    OFFICERS --> DEDUP[Deduplicate preserving order\nfilter tokens < 3 chars]
+
+    DEDUP --> RETURN([Return keyword list])
+```
+
+---
+
+## 7. News Correlation Pipeline
 
 ```mermaid
 flowchart TD
@@ -181,7 +216,7 @@ flowchart TD
     ARTLOOP -->|Done| SORT
 
     ARTLOOP -->|Process| TEXT[Combine title + summary text\nlowercase]
-    TEXT --> KWSCAN[Scan for each keyword\naccumulate weighted score]
+    TEXT --> KWSCAN[Scan each keyword via _kw_re\nword-boundary regex match\naccumulate weighted score]
 
     KWSCAN --> RECENCY{pub_date age?}
     RECENCY -->|< 24 h| BONUS2[Add recency bonus +2]
@@ -203,7 +238,7 @@ flowchart TD
 
 ---
 
-## 7. Signal Scoring Pipeline
+## 8. Signal Scoring Pipeline
 
 Six components are computed from separate data sources, each multiplied by an asset-class-specific weight, then summed and clamped to the -10 to +10 range.
 
@@ -232,7 +267,7 @@ flowchart TD
 
 ---
 
-## 8. Market Context Analysis Pipeline
+## 9. Market Context Analysis Pipeline
 
 ```mermaid
 flowchart TD
@@ -265,7 +300,7 @@ flowchart TD
 
 ---
 
-## 9. Explanation Builder Pipeline
+## 10. Explanation Builder Pipeline
 
 ```mermaid
 flowchart TD
@@ -317,7 +352,7 @@ flowchart TD
 
 ---
 
-## 10. Storage Persistence Pipeline
+## 11. Storage Persistence Pipeline
 
 ```mermaid
 flowchart TD
@@ -336,7 +371,7 @@ flowchart TD
 
 ---
 
-## 11. Retention Policy Pipeline
+## 12. Retention Policy Pipeline
 
 Run automatically at the end of each scan.
 
@@ -363,7 +398,7 @@ flowchart TD
 
 ---
 
-## 12. Backtesting Pipeline
+## 13. Backtesting Pipeline
 
 ```mermaid
 flowchart TD
@@ -398,7 +433,7 @@ flowchart TD
 
 ---
 
-## 13. Full analyse_asset Orchestration
+## 14. Full analyse_asset Orchestration
 
 This is the top-level function called by both `app/scan.py` and directly by `dashboard/main.py`.
 
@@ -436,7 +471,7 @@ flowchart TD
 
 ---
 
-## 14. Parallel Metrics Pre-fetch Pipeline
+## 15. Parallel Metrics Pre-fetch Pipeline
 
 Note: `fetch_all_metrics_parallel` is defined in `src/engine.py` and re-exported via `app/analysis.py`, but the dashboard does **not** call it directly. The market heatmap and category overview are populated from `cached_scan_summary()` in `dashboard/data.py`, which reads the pre-computed `_scan_summary.json.gz` written by the scan pipeline. The diagram below shows `fetch_all_metrics_parallel` for reference — it is available for external use but bypassed by the current dashboard flow.
 

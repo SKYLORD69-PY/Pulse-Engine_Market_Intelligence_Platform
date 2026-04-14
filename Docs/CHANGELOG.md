@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased] — v0.3 development
+
+### Added
+- `generate_keywords(ticker)` in `src/news.py` — auto-builds a keyword list for any ticker from Yahoo Finance metadata (company name tokens, executive surnames). Uses a daemon thread bounded by `REQUEST_TIMEOUT` so a hung network call never blocks the pipeline. Falls back to `[ticker]` on timeout, network failure, or unknown ticker. Part of #35 (v0.3 arbitrary ticker support).
+- `Docs/CONTRIBUTORS.md` — acknowledgement list for all project contributors.
+- 5 new unit tests in `tests/test_core.py`: `generate_keywords` known ticker, unknown ticker, network failure, timeout, and `correlate_news` false-positive regression. Total test count: 42.
+
+### Fixed
+- `correlate_news` in `src/signals.py` now uses word-boundary regex matching (`\b{kw}\b` via `_kw_re`) instead of plain Python substring containment (`kw in blob`). Previously, short keywords such as `"gold"` matched unrelated articles where the word appeared as a substring (e.g. *Goldman Sachs* articles appearing in the Gold section, *S&P 500* articles matching via broad terms).
+
+### Technical
+- `_KW_PATTERN_CACHE` added to `src/signals.py` — module-level dict caching compiled `re.Pattern` objects so keyword patterns are compiled once per process rather than on every article scored.
+- Industry and sector fields intentionally excluded from `generate_keywords` output — terms like `"Technology"` are too broad to use as correlation keywords without causing noise across unrelated assets.
+
+---
+
 ## [0.2.2] - 2026-04-12
 ### "Dashboard Stability + Security + Test Expansion"
 

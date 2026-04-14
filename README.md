@@ -393,6 +393,7 @@ pulse_engine_1/
     ROADMAP.md          Project direction, milestones, and contributor lanes
     CHANGELOG.md        All notable changes by version
     DISCLAIMER.md       Legal and financial disclaimer
+    CONTRIBUTORS.md     List of project contributors
   requirements.txt      Python dependencies
   requirements-dev.txt  Test dependencies (pytest, pytest-mock)
   README.md             This file
@@ -411,6 +412,7 @@ pulse_engine_1/
 | [Docs/code_flow.md](Docs/code_flow.md) | Step-by-step execution flow for every pipeline with Mermaid diagrams |
 | [Docs/variable_list.md](Docs/variable_list.md) | Complete reference of all variables, constants, and return structures |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to report issues, propose changes, and submit pull requests |
+| [Docs/CONTRIBUTORS.md](Docs/CONTRIBUTORS.md) | All project contributors |
 | [Docs/DISCLAIMER.md](Docs/DISCLAIMER.md) | Financial, legal, and data accuracy disclaimers |
 | [Docs/CHANGELOG.md](Docs/CHANGELOG.md) | All notable changes by version |
 | [Docs/ROADMAP.md](Docs/ROADMAP.md) | Project direction, milestones, and contributor lanes |
