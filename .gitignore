@@ -77,15 +77,18 @@ market_data/
 .claude/
 
 # ─── IDE / Editors ────────────────────────────────────────────────────────────
-# PyCharm / IntelliJ
-.idea/
+# PyCharm / IntelliJ — ignore all workspace state except shared run configs
+# Note: glob form (.idea/*) is required so the negation can pierce the directory
+.idea/*
+!.idea/runConfigurations/
 *.iml
 *.iws
 *.ipr
 out/
 
-# VS Code
-.vscode/
+# VS Code — ignore all workspace state except shared debug configs
+.vscode/*
+!.vscode/launch.json
 *.code-workspace
 
 # Sublime Text

@@ -400,6 +400,10 @@ pulse_engine_1/
   CONTRIBUTING.md       Contribution guidelines
   LICENSE               MIT License
   .gitignore            Git ignore rules
+  .vscode/
+    launch.json         VS Code debug/run configurations
+  .idea/
+    runConfigurations/  PyCharm run/debug configurations
   market_data/          Runtime snapshot directory (git-ignored)
 ```
 

@@ -6,7 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — v0.3 development
 
-- No entries yet.
+### Added
+- `.vscode/launch.json`: VS Code debug/run configurations for all five entry points (Dashboard, Scan Dry Run, Scan Full, Analysis CLI, Tests).
+- `.idea/runConfigurations/`: PyCharm run/debug configurations for the same five entry points, compatible with both Community and Professional editions.
+- `CONTRIBUTING.md` **IDE Setup** section documenting how to use the shared configurations in VS Code and PyCharm.
+
+### Changed
+- `.gitignore` updated to unignore `.vscode/launch.json` and `.idea/runConfigurations/` while continuing to exclude all other IDE workspace files.
+- `CONTRIBUTING.md` **Pull Request Process** "Do not commit" list updated to allow the new IDE config paths and clarify which IDE files remain excluded.
+- `README.md` **Project Structure** updated to document the new `.vscode/` and `.idea/runConfigurations/` entries.
 
 ---
 
