@@ -16,6 +16,7 @@ Thank you for your interest in contributing. This document explains how to repor
 - [Reporting Bugs](#reporting-bugs)
 - [Proposing Features](#proposing-features)
 - [Development Setup](#development-setup)
+- [IDE Setup](#ide-setup)
 - [Code Style](#code-style)
 - [Testing](#testing)
 - [Pull Request Process](#pull-request-process)
@@ -126,6 +127,44 @@ streamlit run dashboard/main.py
 
 ---
 
+## IDE Setup
+
+The repository ships pre-configured debug/run configurations for the two most common editors used by open-source Python contributors. Both sets of configs use only portable, project-relative paths so they work on any machine without modification.
+
+### VS Code
+
+Requires the [Python](https://marketplace.visualstudio.com/items?itemName=ms-python.python) and [Debugpy](https://marketplace.visualstudio.com/items?itemName=ms-python.debugpy) extensions.
+
+Open the project folder in VS Code. The configurations in `.vscode/launch.json` will appear in the **Run and Debug** panel (`Ctrl+Shift+D`):
+
+| Configuration | Equivalent command |
+|---|---|
+| Dashboard (Streamlit) | `streamlit run dashboard/main.py` |
+| Scan (Dry Run) | `python -m app.scan --dry-run` |
+| Scan (Full) | `python -m app.scan` |
+| Analysis CLI | `python -m app.analysis` |
+| Tests (pytest) | `pytest tests/ -v --tb=short` |
+
+Select your virtual environment interpreter (`Ctrl+Shift+P` → *Python: Select Interpreter* → choose `.venv`), then pick any configuration and press `F5` to run with debugging.
+
+### PyCharm (Community or Professional)
+
+Open the project root as a PyCharm project. Configure the interpreter once via **File → Settings → Project → Python Interpreter** — point it at `.venv/Scripts/python` (Windows) or `.venv/bin/python` (macOS/Linux).
+
+The run configurations in `.idea/runConfigurations/` are loaded automatically by PyCharm and appear in the run/debug dropdown in the toolbar:
+
+| Configuration | Equivalent command |
+|---|---|
+| Dashboard | `python -m streamlit run dashboard/main.py` |
+| Scan (Dry Run) | `python -m app.scan --dry-run` |
+| Scan (Full) | `python -m app.scan` |
+| Analysis CLI | `python -m app.analysis` |
+| Tests | `pytest tests/ -v --tb=short` |
+
+Select a configuration from the dropdown and press the green **Run** button or **Debug** button (the bug icon) to launch with a full debugger attached.
+
+---
+
 ## Code Style
 
 [![PEP 8](https://img.shields.io/badge/style-PEP%208-4B8BBE?style=flat-square)](https://peps.python.org/pep-0008/)
@@ -206,7 +245,7 @@ If you are modifying signal scoring logic (`compute_signal_score` in `src/signal
 7. **Do not commit**:
    - `market_data/` contents
    - `.venv/` or any virtual environment directory
-   - IDE configuration files (`.idea/`, `.vscode/`)
+   - IDE workspace files beyond the committed configs (`.idea/workspace.xml`, `.idea/*.iml`, `.vscode/settings.json`, etc.)
    - Any file containing API keys, tokens, or credentials
 
 ---

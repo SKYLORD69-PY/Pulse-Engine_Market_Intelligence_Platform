@@ -7,16 +7,61 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] — v0.3 development
 
 ### Added
-- `generate_keywords(ticker)` in `src/news.py` — auto-builds a keyword list for any ticker from Yahoo Finance metadata (company name tokens, executive surnames). Uses a daemon thread bounded by `REQUEST_TIMEOUT` so a hung network call never blocks the pipeline. Falls back to `[ticker]` on timeout, network failure, or unknown ticker. Part of #35 (v0.3 arbitrary ticker support).
-- `Docs/CONTRIBUTORS.md` — acknowledgement list for all project contributors.
-- 5 new unit tests in `tests/test_core.py`: `generate_keywords` known ticker, unknown ticker, network failure, timeout, and `correlate_news` false-positive regression. Total test count: 42.
+- `.vscode/launch.json`: VS Code debug/run configurations for all five entry points (Dashboard, Scan Dry Run, Scan Full, Analysis CLI, Tests).
+- `.idea/runConfigurations/`: PyCharm run/debug configurations for the same five entry points, compatible with both Community and Professional editions.
+- `CONTRIBUTING.md` **IDE Setup** section documenting how to use the shared configurations in VS Code and PyCharm.
+
+### Changed
+- `.gitignore` updated to unignore `.vscode/launch.json` and `.idea/runConfigurations/` while continuing to exclude all other IDE workspace files.
+- `CONTRIBUTING.md` **Pull Request Process** "Do not commit" list updated to allow the new IDE config paths and clarify which IDE files remain excluded.
+- `README.md` **Project Structure** updated to document the new `.vscode/` and `.idea/runConfigurations/` entries.
+
+---
+
+## [0.2.3] - 2026-04-14
+### "Ticker Keyword Intelligence + Correlation Reliability"
+
+### Added
+- `generate_keywords(ticker)` in `src/news.py` for arbitrary ticker support groundwork:
+  - pulls Yahoo Finance metadata via `yfinance`
+  - includes ticker symbol, company name tokens, and top executive surnames
+  - removes duplicate and short tokens (`< 3` chars)
+  - excludes broad corporate suffix noise (`inc`, `corp`, `group`, etc.)
+  - bounded by `REQUEST_TIMEOUT` using a daemon thread so hung metadata calls cannot block the pipeline
+  - graceful fallback to `[ticker]` for timeout, network failure, or unknown symbols
+- `Docs/CONTRIBUTORS.md` added to document acknowledged contributors.
+- 5 focused tests added in `tests/test_core.py`:
+  - `generate_keywords` known ticker path
+  - unknown ticker fallback path
+  - network failure fallback path
+  - timeout fallback path
+  - `correlate_news` regression guard against substring false positives
+- Test suite count increased to 42.
 
 ### Fixed
-- `correlate_news` in `src/signals.py` now uses word-boundary regex matching (`\b{kw}\b` via `_kw_re`) instead of plain Python substring containment (`kw in blob`). Previously, short keywords such as `"gold"` matched unrelated articles where the word appeared as a substring (e.g. *Goldman Sachs* articles appearing in the Gold section, *S&P 500* articles matching via broad terms).
+- `correlate_news` in `src/signals.py` now uses word-boundary regex matching (`\b{kw}\b` via `_kw_re`) instead of plain substring containment (`kw in blob`). This removes false-positive matches where short keywords were only present as substrings (for example, `gold` matching `goldman`).
+- Dashboard stale-data handling in `dashboard/main.py` changed from automatic stale-triggered reruns to explicit user action (`Refresh now`), reducing involuntary refresh loops.
+- Dashboard refresh epoch increments now use session-state source of truth to avoid stale local increments during refresh/scan actions.
+
+### Changed
+- Sidebar now includes `Enable auto background scan` toggle in `dashboard/main.py`, allowing contributors/users to disable scan auto-trigger behavior during interactive sessions.
+- Background scan refresh and manual refresh flows were aligned to use consistent state updates before rerun.
+- CI workflow concurrency policy in `.github/workflows/ci.yml` updated to preserve all `main` branch runs (only non-main runs are canceled in-progress), keeping branch checks reliable during rapid pushes.
+
+### Documentation
+- `Docs/code_flow.md` expanded with the keyword generation pipeline and updated news-correlation matching flow notes.
+- `Docs/variable_list.md` extended with new symbols/constants (`generate_keywords`, `_CORP_SUFFIXES`, `_KW_PATTERN_CACHE`, `_kw_re`) and updated correlation behavior references.
+- `README.md` improvements:
+  - fixed disclaimer badge/doc links
+  - added Docker quick-start TOC entry
+  - normalized scan invocation to module form (`python -m app.scan`)
+  - added contributors document references
+- `CONTRIBUTING.md` updated to use module-form scan commands (`python -m app.scan --dry-run`) for consistency with package layout.
 
 ### Technical
-- `_KW_PATTERN_CACHE` added to `src/signals.py` — module-level dict caching compiled `re.Pattern` objects so keyword patterns are compiled once per process rather than on every article scored.
-- Industry and sector fields intentionally excluded from `generate_keywords` output — terms like `"Technology"` are too broad to use as correlation keywords without causing noise across unrelated assets.
+- `_KW_PATTERN_CACHE` introduced in `src/signals.py` to reuse compiled regex patterns across correlation calls, reducing repeated regex compilation overhead.
+- `_kw_re` helper added to centralize safe keyword pattern construction.
+- Industry and sector fields intentionally excluded from `generate_keywords` output because broad labels (for example, `Technology`) create noisy cross-asset matches.
 
 ---
 
